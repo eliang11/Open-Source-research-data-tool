@@ -21,11 +21,8 @@ This tool is designed for:
 ### Installation
 Download 'publicdata.py' onto your device; no other extra dependencies are needed.
 
-###First 
-
-
-2. Run publicdata.py on your device (can be through an IDE for Python, or simply the command line)
-3. Follow the options after the tool runs
+### First run
+Open a terminal, navigate to the folder containing 'publicdata.py ', and run:
 
 Example:
 Downloaded datasets need a folder to save into.
