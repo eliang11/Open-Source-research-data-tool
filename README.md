@@ -1,15 +1,15 @@
 # Open Source Research Data Tool
-Web scrapes open city data portals for research purposes. 
+Search and download from open data portals by their dcat catalogs
 
 # What is it?
 This tool helps researchers work with datasets from open data portals without visiting each portal's website individually. It supports multiple BC municipal portals (Kelowna, Vancouver, Victoria, along with 
-portals you add yourself), lets you search each portal's catalog by keyword, and allows you to pick which datasets and their formats to download. It detects new versions of datasets that have been updated at the source. It's designed to be a polite scraper. has built-in rate limits along with robot.txt for ethical purposes and user identification. 
+portals you add yourself), lets you search each portal's catalogue by keyword, and allows you to pick which datasets and their formats to download. It detects new versions of datasets that have been updated at the source. It's designed to be a polite scraper. has built-in rate limits along with robot.txt for ethical purposes and user identification. 
 
 
 # Who is it for?
 This tool is designed for:
 - Researchers who need repeatable data pulls from open data portals
-- Research assistants doing regular refreshes as new data publishes
+- Research assistants doing regular refreshes as new data is published
 - Anyone working with open data catalogs
 
 ## Quick Start
@@ -119,6 +119,17 @@ Files downloaded:                  1
 Datasets with no matching format:  0
 No issues encountered this session.
 
+### How it works
+1. Choose a portal from the built-in list, or add your own
+2. The tool fetches the portal's dataset catalog
+3. If you've downloaded from this portal before, the tool checks for updates and offers to refresh them
+4. Enter a search keyword
+5. Review matching datasets and pick which ones to download
+6. Pick a format (CSV, GeoJSON, etc.) or "all formats"
+7. Files download to your configured folder
+8. Summary shows what worked, what didn't and why
+
+### Detailed Features
 
 # Multiple Users
-The tool is designed for individual use, one user at a time on their own machine. Each user's configuration, portal list, and download history are stored in files in their home directory; users on different machines or with different logins don't interfere with each other. This tool does not handle simultaneous access from multiple users to the same config files or download folder. If you are running the in a shared environment, give each user their own login or at least their own download folder to avoid conflicts. 
+The tool is designed for individual use, one user at a time on their own machine. Each user's configuration, portal list, and download history are stored in files in their home directory; users on different machines or with different logins don't interfere with each other. This tool does not handle simultaneous access from multiple users to the same config files or download folder. If you are running it in a shared environment, give each user their own login or at least their own download folder to avoid conflicts. 
