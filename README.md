@@ -2,7 +2,7 @@
 Search and download from open data portals by their DCAT catalogs
 
 ## What is it?
-This tool helps researchers work with datasets from open data portals without visiting each portal's website individually. It supports multiple BC municipal portals (Kelowna, Vancouver, Victoria and Burnaby) plus any portals you add yourself, lets you search each portal's catalogue by keyword, and allows you to pick which datasets and their formats to download. It detects new versions of datasets that have been updated at the source. It's designed to be a polite scraper, with built-in rate limits along with robots.txt checking and transparent user identification. 
+This tool helps researchers work with datasets from open data portals without visiting each portal's website individually. It supports multiple BC municipal portals (Kelowna, Vancouver, Victoria and Burnaby) plus any portals you add yourself, lets you search each portal's catalogue by keyword, and allows you to pick which datasets and their formats to download. It detects new versions of datasets that have been updated at the source. It's designed to be a polite scraper, with built-in rate limits, robots.txt checks, and transparent user identification. 
 
 
 ## Who is it for?
@@ -21,7 +21,7 @@ This tool is designed for:
 Download `publicdata.py` onto your device; no other extra dependencies are needed.
 
 ### First run
-Open a terminal, navigate to the folder containing `publicdata.py` , and run:
+Open a terminal, navigate to the folder containing `publicdata.py`, and run:
 ```
 python publicdata.py
 ```
@@ -134,12 +134,15 @@ No issues encountered this session.
 
 ## Detailed Features
 
+Each subsection below describes one feature of the tool. 
+
 ### Multi-portal support
 
 The tool ships with four built-in BC city portals: Kelowna, Vancouver, Victoria, and Burnaby. You can add your own by providing a portal name, its DCAT catalog url and the province it's in.
 User-added portals are grouped by province in the picker for easy navigation.
 
-Portal choices are saved to `~/.publicdataportals.json` and persist over runs. Built-in portals can't be deleted, but user-added ones can be removed with the options.
+Portal choices are saved to `~/.publicdataportals.json` and persist over runs. Built-in portals can't be deleted, but user-added ones can be removed 
+using the "Delete a user-added portal" option in the picker menu.
 
 ### Keyword Search
 
@@ -152,7 +155,7 @@ Found 7 datasets matching 'roads'.
 ```
 
 ### Interactive dataset and format picking
-After search results appear, the tool asks you to pick which datasets to download. You can pick individual datasets like (1,3,5), ranges (1-4), combinations(1-3,7,10) or all.
+After search results appear, the tool asks you to pick which datasets to download. You can pick individual datasets like (`1,3,5`), ranges (`1-4`), combinations (`1- 3,7,10 `), or all.
 Once you pick the datasets, the tool shows you which formats are available to download across all your picks. 
 Note: some formats may be available for some datasets and not for others
 
@@ -182,6 +185,7 @@ Refreshing 1 dataset(s)...
     Saving as:   Park_Baseball_Dugout.csv
     Done (3.2 KB)
 ```
+
 ### Ethical Scraping
 The tool follows several conventions for well-behaved automated access to public data:
 - Rate limiting: 1.5 seconds between requests to the same domain
@@ -190,7 +194,7 @@ The tool follows several conventions for well-behaved automated access to public
 - Size confirmation: prompts before files over 100 MB
 
 ### Structured notifications
-During a run, the tool records any download failures, robots.txt refusals, missing format warnings, and size-skip decisions. At the end of the session, these are printed as a grouped summary rather than scattered through the download output 
+During a run, the tool records any download failures, robots.txt refusals, missing format warnings, and size-skip decisions. At the end of the session, these are printed as a grouped summary rather than scattered through the download output.
 
 Example:
 ```
@@ -211,9 +215,6 @@ Datasets without the requested format (2):
     Suggestion: Try 'All formats' instead, or check the dataset's landing page
 ```
     
-### Persistent Configuration
-The tool remembers your preferences across sessions. On the first run, you're asked where to save downloads and what contact info to identify yourself with. After that, subsequent runs use those preferences. To reset, delete the config file. Look in the potential errors and their resolutions for how to delete the config file. 
-
 ### Download history
 Every download is recorded to `~/.publicdatahistory.json`. Each entry includes:
 - which portal it came from
@@ -224,9 +225,14 @@ Every download is recorded to `~/.publicdatahistory.json`. Each entry includes:
 The history file is what powers update detection; the tool uses it to compare your local record against the current portal catalog
 
 To view the file directly:
-**Windows PowerShell:** Get-Content $env:USERPROFILE\.publicdatahistory.json
-**macOS / Linux:** cat ~/.publicdatahistory.json
-
+**Windows PowerShell:** 
+```
+Get-Content $env:USERPROFILE\.publicdatahistory.json
+```
+**macOS / Linux:** 
+```
+cat ~/.publicdatahistory.json
+```
 ## Files created
 
 The tool creates three files in your home directory to remember your 
@@ -267,9 +273,10 @@ Remove-Item $env:USERPROFILE\.publicdataconfig.json
 ```
 rm ~/.publicdataconfig.json
 ```
+
 ## Multiple Users
 The tool is designed for individual use, one user at a time on their own machine. Each user's configuration, portal list, and download history are stored in files in their home directory; users on different machines or with different logins don't interfere with each other. This tool does not handle simultaneous access from multiple users to the same config files or download folder. If you are running it in a shared environment, give each user their own login or at least their own download folder to avoid conflicts. 
 
 ## Known Limitations
 - Only supports ArcGIS Hub portals (with DCAT feed). CKAN and Socrata portals aren't supported.
-- No CKAN support means the Province of BC can't be used yet. 
+- No CKAN support means the Province of BC catalog can't be used yet. 
