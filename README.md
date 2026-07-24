@@ -22,8 +22,13 @@ Download `publicdata.py` onto your device; no other extra dependencies are neede
 
 ### First run
 Open a terminal, navigate to the folder containing `publicdata.py`, and run:
+**Windows Powershell:**
 ```
 python publicdata.py
+```
+**Mac OS / linux:**
+```
+python3 publicdata.py
 ```
 Example:
 ```
