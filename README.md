@@ -33,17 +33,17 @@ python3 publicdata.py
 Example:
 ```
 Downloaded datasets need a folder to save into.
-Default location: C:\Users\ethan\OneDrive\Desktop\open-data-downloads
+Default location: 
 
 Would you like to configure a permanent folder for future runs?
   y = yes, ask me where and remember it
   n = no, just use the default for this run only
   Enter = same as 'n'
 Configure permanent folder? [y/N]: n
-Using C:\Users\ethan\OneDrive\Desktop\open-data-downloads for this run only.
+Using  for this run only.
 (You'll be asked again next time you run the tool.)
 
-Files will be saved to: C:\Users\ethan\OneDrive\Desktop\open-data-downloads
+Files will be saved to: 
 
 
 --- Contact info ---
