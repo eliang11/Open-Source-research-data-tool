@@ -953,8 +953,13 @@ def check_file_size(url):
         return None
 
 
-def safe_filename(dataset_title, distribution, fallback_ext="dat"):
-    """Build a filesystem-safe filename based on title + format."""
+def safe_filename(dataset_title, distribution, portal_key=None, fallback_ext="dat"):
+    """Build a filesystem-safe filename based on title + format.
+    
+    Prefixes the portal_key to reduce collisions across portals.
+    If a file with the same name already exists in DOWNLOAD_DIR, appends
+    a counter (e.g. Street_2.csv) to avoid overwriting.
+    """
     title_clean = "".join(c if c.isalnum() or c in "-_." else "_" for c in dataset_title)
     title_clean = title_clean.strip("_") or "dataset"
 
@@ -983,7 +988,20 @@ def safe_filename(dataset_title, distribution, fallback_ext="dat"):
     if not ext:
         ext = fallback_ext
 
-    return f"{title_clean}.{ext}"
+    # Prefix with portal key so downloads from different portals don't collide
+    prefix = f"{portal_key}_" if portal_key else ""
+    base_name = f"{prefix}{title_clean}.{ext}"
+
+    # If the file already exists, add a counter to make it unique
+    if DOWNLOAD_DIR is not None:
+        out_path = DOWNLOAD_DIR / base_name
+        if out_path.exists():
+            counter = 2
+            while (DOWNLOAD_DIR / f"{prefix}{title_clean}_{counter}.{ext}").exists():
+                counter += 1
+            base_name = f"{prefix}{title_clean}_{counter}.{ext}"
+
+    return base_name
 
 
 def download_distribution(distribution, dataset, portal_key):
@@ -1022,7 +1040,7 @@ def download_distribution(distribution, dataset, portal_key):
             )
             return False
 
-    filename = safe_filename(dataset_title, distribution)
+    filename = safe_filename(dataset_title, distribution, portal_key)
     DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
     out_path = DOWNLOAD_DIR / filename
 
@@ -1067,104 +1085,141 @@ def main():
     global robots_cache
     robots_cache = RobotsCache(USER_AGENT)
 
-    #pick which portal to search
-    portal_key, portal = pick_portal()
-    if portal is None:
-        print("No portal selected. Exiting.")
-        return
+    #Session state — kept across searches within the same portal
+    current_portal_key = None
+    current_portal = None
+    current_datasets = None
 
-    #Fetch this portal's catalog
-    datasets = fetch_catalog(portal)
-    if datasets is None:
-        notifications.print_summary()
-        return
+    #Main session loop — keeps running until user quits
+    while True:
+        #If no portal selected yet, prompt for one
+        if current_portal is None:
+            current_portal_key, current_portal = pick_portal()
+            if current_portal is None:
+                #User cancelled the portal picker
+                break
 
-    
-    updates = check_for_updates(datasets, portal_key)
-    if updates:
-        selected_updates = prompt_for_update_refresh(updates)
-        if selected_updates:
-            print(f"\nRefreshing {len(selected_updates)} dataset(s)...\n")
-            for u in selected_updates:
-                record = u["record"]
-                current_ds = u["current_dataset"]
-                fmt = record.get("distribution_format")
+            #Fetch catalog for this portal (only once per portal)
+            current_datasets = fetch_catalog(current_portal)
+            if current_datasets is None:
+                #Catalog failed — reset and let user pick another portal
+                print("Try a different portal.\n")
+                current_portal_key = None
+                current_portal = None
+                continue
 
-                dists = find_downloadable_distributions(current_ds, fmt)
-                if not dists:
-                    print(f"  Could not find {fmt} version of {record['dataset_title']} — skipping")
-                    continue
+            #Check for updates on previously-downloaded datasets from this portal
+            updates = check_for_updates(current_datasets, current_portal_key)
+            if updates:
+                selected_updates = prompt_for_update_refresh(updates)
+                if selected_updates:
+                    print(f"\nRefreshing {len(selected_updates)} dataset(s)...\n")
+                    for u in selected_updates:
+                        record = u["record"]
+                        current_ds = u["current_dataset"]
+                        fmt = record.get("distribution_format")
 
-                print(f"  {record['dataset_title']} ({fmt})")
-                download_distribution(dists[0], current_ds, portal_key)
-            print()
+                        dists = find_downloadable_distributions(current_ds, fmt)
+                        if not dists:
+                            print(f"  Could not find {fmt} version of {record['dataset_title']} — skipping")
+                            continue
 
-    #Normal keyword-search flow
-    keyword = input(f"Enter a keyword to search {portal['name']} (or 'quit' to exit): ").strip()
-    if not keyword or keyword.lower() in ("quit", "exit", "q"):
-        print("Exiting.")
-        return
+                        print(f"  {record['dataset_title']} ({fmt})")
+                        download_distribution(dists[0], current_ds, current_portal_key)
+                    print()
 
-    matches = search_catalog(datasets, keyword)
-    print(f"\nFound {len(matches)} datasets matching '{keyword}'.\n")
-    if not matches:
-        return
+        #Keyword-search flow for the current portal
+        keyword = input(f"Enter a keyword to search {current_portal['name']} (or 'quit' to exit): ").strip()
+        if not keyword or keyword.lower() in ("quit", "exit", "q"):
+            break
 
-    selected = pick_datasets(matches)
-    if not selected:
-        return
+        matches = search_catalog(current_datasets, keyword)
+        print(f"\nFound {len(matches)} datasets matching '{keyword}'.\n")
 
-    preferred_format = pick_formats(selected)
-    if preferred_format == "CANCELLED":
-        return
-    if preferred_format is None:
-        print("Downloading all available formats.\n")
-    else:
-        print(f"Downloading only {preferred_format} versions.\n")
+        if matches:
+            selected = pick_datasets(matches)
 
-    downloaded = 0
-    no_data = 0
+            if selected:
+                preferred_format = pick_formats(selected)
+                if preferred_format == "CANCELLED":
+                    pass  #User cancelled format picker — skip to "what next"
+                else:
+                    if preferred_format is None:
+                        print("Downloading all available formats.\n")
+                    else:
+                        print(f"Downloading only {preferred_format} versions.\n")
 
-    for i, ds in enumerate(selected, 1):
-        title = ds.get("title", "(untitled)")
-        print(f"[{i}] {title}")
+                    downloaded = 0
+                    no_data = 0
 
-        downloadables = find_downloadable_distributions(ds, preferred_format)
-        if not downloadables:
-            if preferred_format:
-                print(f"    (no {preferred_format} version available for this dataset)")
-                notifications.add(
-                    level=Notifications.LEVEL_INFO,
-                    category="no_format_available",
-                    subject=title,
-                    reason=f"No {preferred_format} version in this dataset's distributions",
-                    suggestion=f"Try 'All formats' instead, or check the dataset's landing page",
-                )
-            else:
-                print("    (no downloadable data — landing page only)")
-                notifications.add(
-                    level=Notifications.LEVEL_INFO,
-                    category="no_format_available",
-                    subject=title,
-                    reason="Dataset only offers a web-page landing link, no data files",
-                    suggestion="Check the source website for the actual data",
-                )
-            no_data += 1
+                    for i, ds in enumerate(selected, 1):
+                        title = ds.get("title", "(untitled)")
+                        modified = ds.get("modified", "")
+                        modified_display = modified[:10] if modified else "unknown date"
+                        print(f"[{i}] {title}  (source last updated: {modified_display})")
+
+                        downloadables = find_downloadable_distributions(ds, preferred_format)
+                        if not downloadables:
+                            if preferred_format:
+                                print(f"    (no {preferred_format} version available for this dataset)")
+                                notifications.add(
+                                    level=Notifications.LEVEL_INFO,
+                                    category="no_format_available",
+                                    subject=title,
+                                    reason=f"No {preferred_format} version in this dataset's distributions",
+                                    suggestion=f"Try 'All formats' instead, or check the dataset's landing page",
+                                )
+                            else:
+                                print("    (no downloadable data — landing page only)")
+                                notifications.add(
+                                    level=Notifications.LEVEL_INFO,
+                                    category="no_format_available",
+                                    subject=title,
+                                    reason="Dataset only offers a web-page landing link, no data files",
+                                    suggestion="Check the source website for the actual data",
+                                )
+                            no_data += 1
+                            continue
+
+                        for dist in downloadables:
+                            fmt = dist.get("format") or "unknown"
+                            print(f"  Format: {fmt}")
+                            if download_distribution(dist, ds, current_portal_key):
+                                downloaded += 1
+
+                    print(f"\n--- Session summary ---")
+                    print(f"Portal:                            {current_portal['name']}")
+                    print(f"Selected datasets:                 {len(selected)}")
+                    print(f"Files downloaded:                  {downloaded}")
+                    print(f"Datasets with no matching format:  {no_data}")
+
+        #"What next?" prompt at the end of each cycle
+        print()
+        print("What would you like to do next?")
+        print(f"  [1] Search {current_portal['name']} again")
+        print("  [2] Pick a different portal")
+        print("  [3] Quit")
+
+        try:
+            next_action = input("Your choice: ").strip().lower()
+        except (KeyboardInterrupt, EOFError):
+            break
+
+        if next_action in ("3", "quit", "exit", "q"):
+            break
+        elif next_action == "2":
+            current_portal_key = None
+            current_portal = None
+            current_datasets = None
+        elif next_action == "1" or not next_action:
+            pass  # continue with same portal
+        else:
+            print("Please pick 1, 2, or 3.\n")
             continue
+        #Otherwise (including "1" or empty), just continue the loop
+        #which loops back to the keyword search for the same portal
 
-        for dist in downloadables:
-            fmt = dist.get("format") or "unknown"
-            print(f"  Format: {fmt}")
-            if download_distribution(dist, ds, portal_key):
-                downloaded += 1
-
-    print(f"\n--- Summary ---")
-    print(f"Portal:                            {portal['name']}")
-    print(f"Selected datasets:                 {len(selected)}")
-    print(f"Files downloaded:                  {downloaded}")
-    print(f"Datasets with no matching format:  {no_data}")
-
-    #Print any notifications collected during the run
+    print("\nExiting.")
     notifications.print_summary()
 
 
