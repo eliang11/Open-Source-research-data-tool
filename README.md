@@ -18,7 +18,17 @@ This tool is designed for:
 - No external packages required (uses only the standard library)
 
 ### Installation
-Download `publicdata.py` onto your device; no other extra dependencies are needed.
+Download the repository (Code → Download ZIP, then unzip), or clone it.
+
+To use the command-line tool only, `publicdata.py` on its own is enough. To use the web interface as well, keep the folder layout intact:
+publicdata.py
+start-website.bat
+webapp/
+    server.py
+    index.html
+`server.py` looks for `publicdata.py` in the folder above it, and `start-website.bat` looks for `webapp/`. Moving files out of this layout will stop the website from starting. 
+
+No external packages are needed; the tool uses only Python standard library.
 
 ### First run
 Open a terminal, navigate to the folder containing `publicdata.py`, and run:
@@ -284,4 +294,5 @@ The tool is designed for individual use, one user at a time on their own machine
 
 ## Known Limitations
 - Only supports ArcGIS Hub portals (with DCAT feed). CKAN and Socrata portals aren't supported.
-- No CKAN support means the Province of BC catalog can't be used yet. 
+- No CKAN support means the Province of BC catalog can't be used yet.
+- webapp only supports Windows Users 
