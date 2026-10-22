@@ -1,0 +1,667 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Open Data Explorer</title>
+<style>
+  :root {
+    --bg: #f5f6f8; --panel: #ffffff; --text: #1b2430; --muted: #5f6b7a;
+    --border: #e1e5ea; --accent: #0f766e; --accent-hover: #0b5e58; --accent-soft: #e5f3f1;
+    --warn: #a15c07; --warn-soft: #fdf2e1; --err: #b42318; --err-soft: #fdeceb;
+    --ok: #157f3b; --ok-soft: #e7f6ec;
+    --radius: 10px; --shadow: 0 1px 2px rgba(16, 24, 40, .06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #11151b; --panel: #1a2029; --text: #e6e9ee; --muted: #98a2b0;
+      --border: #2a323d; --accent: #2cc4b0; --accent-hover: #4fd8c6; --accent-soft: #143331;
+      --warn: #f0a53a; --warn-soft: #3a2a12; --err: #f28b82; --err-soft: #3b1a1a;
+      --ok: #5fd08a; --ok-soft: #16301f; --shadow: none;
+    }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  a { color: var(--accent); }
+  button { font: inherit; cursor: pointer; }
+  input, select { font: inherit; color: inherit; }
+
+  .topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    padding: 12px 24px; background: var(--panel); border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 5; }
+  .brand { font-weight: 650; font-size: 16px; }
+  .brand span { font-weight: 400; color: var(--muted); margin-left: 8px; font-size: 13px; }
+  nav { display: flex; gap: 4px; }
+  nav button { background: none; border: 0; padding: 6px 12px; border-radius: 6px; color: var(--muted); }
+  nav button:hover { color: var(--text); background: var(--bg); }
+  nav button.active { color: var(--accent); background: var(--accent-soft); font-weight: 600; }
+
+  .layout { display: grid; grid-template-columns: 260px minmax(0, 1fr); min-height: calc(100vh - 53px); }
+  aside { border-right: 1px solid var(--border); background: var(--panel); padding: 20px 14px; }
+  aside h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 8px 10px; }
+  .province { font-size: 12px; color: var(--muted); margin: 14px 8px 4px; }
+  .portal { display: flex; align-items: center; border-radius: 6px; }
+  .portal:hover { background: var(--bg); }
+  .portal.active { background: var(--accent-soft); }
+  .portal-name { flex: 1; text-align: left; background: none; border: 0; padding: 7px 8px; color: var(--text);
+    display: flex; align-items: center; gap: 6px; }
+  .portal.active .portal-name { color: var(--accent); font-weight: 600; }
+  .badge { font-size: 11px; padding: 0 6px; border-radius: 999px; background: var(--bg);
+    border: 1px solid var(--border); color: var(--muted); font-weight: 400; }
+  .icon-btn { background: none; border: 0; color: var(--muted); padding: 4px 8px; font-size: 16px; line-height: 1; border-radius: 4px; }
+  .icon-btn:hover { color: var(--err); }
+
+  details.add { margin-top: 18px; border-top: 1px solid var(--border); padding-top: 14px; }
+  details.add summary { cursor: pointer; color: var(--accent); padding: 0 8px; font-weight: 500; }
+  .stack { display: grid; gap: 10px; padding: 12px 8px 0; }
+  .stack label { display: grid; gap: 3px; font-size: 12px; color: var(--muted); }
+  .hint { font-size: 12px; color: var(--muted); margin: 0; }
+  .hint code { font-size: 11px; }
+
+  input[type=text], input[type=search], input[type=url], select {
+    width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); }
+  input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+
+  .btn { background: var(--accent); color: #fff; border: 0; border-radius: 6px; padding: 8px 16px; font-weight: 600; }
+  @media (prefers-color-scheme: dark) { .btn { color: #06201d; } }
+  .btn:hover { background: var(--accent-hover); }
+  .btn:disabled { opacity: .5; cursor: default; }
+  .secondary { background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 7px 12px; }
+  .secondary:hover { border-color: var(--muted); }
+  .small { padding: 3px 10px; font-size: 12px; }
+
+  main { padding: 24px 32px 120px; max-width: 1000px; width: 100%; }
+  .muted { color: var(--muted); }
+  .empty { color: var(--muted); padding: 48px 0; text-align: center; }
+  .loading::before { content: ""; display: inline-block; width: 12px; height: 12px; margin-right: 8px; vertical-align: -1px;
+    border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .portal-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 18px; }
+  .portal-header h1 { margin: 0; font-size: 22px; }
+  .portal-header p { margin: 2px 0 0; }
+
+  .search { display: flex; gap: 8px; margin-bottom: 20px; }
+  .search input { font-size: 15px; padding: 10px 12px; }
+
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px 18px; margin-bottom: 20px; }
+  .panel h2 { font-size: 15px; margin: 0 0 10px; }
+  .panel.notice { border-color: var(--warn); background: var(--warn-soft); }
+
+  .results-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; color: var(--muted); }
+  .check { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+  .card { display: flex; gap: 12px; align-items: flex-start; background: var(--panel); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px 16px; margin-bottom: 8px; cursor: pointer; box-shadow: var(--shadow); }
+  .card:hover { border-color: var(--muted); }
+  .card.selected { border-color: var(--accent); background: var(--accent-soft); }
+  .card.disabled { cursor: default; opacity: .65; }
+  .card.disabled:hover { border-color: var(--border); }
+  .card input { margin-top: 3px; accent-color: var(--accent); }
+  .card-body { min-width: 0; flex: 1; }
+  .card-title { font-weight: 600; }
+  .desc { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+  .meta { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; margin-top: 8px; font-size: 12px; }
+  .fmt { font-size: 11px; font-weight: 600; letter-spacing: .03em; padding: 1px 7px; border-radius: 4px;
+    background: var(--bg); border: 1px solid var(--border); }
+
+  .download-bar { position: fixed; bottom: 0; left: 260px; right: 0; background: var(--panel); border-top: 1px solid var(--border);
+    padding: 12px 32px; display: flex; gap: 12px; align-items: center; z-index: 4; box-shadow: 0 -4px 12px rgba(16,24,40,.06); }
+  .download-bar label { display: flex; align-items: center; gap: 8px; }
+  .download-bar select { width: auto; min-width: 200px; }
+  .download-bar .count { margin-left: auto; color: var(--muted); }
+
+  .log-entry { padding: 10px 0; border-top: 1px solid var(--border); }
+  .log-entry:first-of-type { border-top: 0; }
+  .log-title { font-weight: 600; margin-bottom: 4px; }
+  .result { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 3px 0; font-size: 13px; }
+  .status { font-weight: 600; font-size: 12px; padding: 1px 8px; border-radius: 999px; }
+  .downloaded .status { color: var(--ok); background: var(--ok-soft); }
+  .too_large .status, .blocked .status, .skipped .status { color: var(--warn); background: var(--warn-soft); }
+  .failed .status { color: var(--err); background: var(--err-soft); }
+  .summary { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); font-weight: 600; }
+
+  .update-row { display: flex; gap: 10px; align-items: flex-start; padding: 6px 0; }
+  .update-row input { margin-top: 4px; accent-color: var(--accent); }
+  .row-actions { display: flex; gap: 8px; margin-top: 10px; }
+
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { font-size: 12px; color: var(--muted); font-weight: 600; white-space: nowrap; }
+  td.nowrap { white-space: nowrap; }
+
+  .settings { max-width: 560px; }
+  .settings .stack { padding: 0; }
+  .settings label { font-size: 13px; }
+  code.ua { display: block; padding: 8px 10px; background: var(--bg); border-radius: 6px; font-size: 12px; word-break: break-all; }
+
+  #toast { position: fixed; bottom: 24px; right: 24px; max-width: 420px; padding: 10px 14px; border-radius: 8px;
+    background: var(--err); color: #fff; opacity: 0; transform: translateY(8px); transition: .2s; pointer-events: none; z-index: 10; }
+  #toast.show { opacity: 1; transform: none; }
+  #toast.ok { background: var(--ok); }
+
+  @media (max-width: 760px) {
+    .layout { grid-template-columns: 1fr; }
+    aside { border-right: 0; border-bottom: 1px solid var(--border); }
+    main { padding: 20px 16px 140px; }
+    .download-bar { left: 0; padding: 12px 16px; flex-wrap: wrap; }
+    .brand span { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">Open Data Explorer<span>Search and download municipal open data</span></div>
+  <nav>
+    <button data-view="search" class="active">Search</button>
+    <button data-view="history">History</button>
+    <button data-view="settings">Settings</button>
+  </nav>
+</header>
+
+<div class="layout">
+  <aside>
+    <h2>Portals</h2>
+    <div id="portal-list"><p class="muted loading" style="padding:0 8px">Loading…</p></div>
+
+    <details class="add">
+      <summary>Add a portal</summary>
+      <form id="add-portal-form" class="stack">
+        <p class="hint">ArcGIS Hub portals only. The catalog URL is usually
+          <code>{homepage}/api/feed/dcat-us/1.1.json</code> or <code>{homepage}/data.json</code>.</p>
+        <label>Short key <input type="text" name="key" placeholder="nanaimo" required pattern="\S+"></label>
+        <label>Display name <input type="text" name="name" placeholder="City of Nanaimo" required></label>
+        <label>Catalog URL <input type="url" name="catalog_url" placeholder="https://…/data.json" required></label>
+        <label>Homepage (optional) <input type="url" name="homepage" placeholder="https://…"></label>
+        <label>Province (optional) <input type="text" name="province" placeholder="British Columbia"></label>
+        <button class="btn" type="submit">Add portal</button>
+      </form>
+    </details>
+  </aside>
+
+  <main>
+    <section id="view-search">
+      <div id="portal-header"><p class="empty">Pick a portal on the left to begin.</p></div>
+      <div id="updates" class="panel notice" hidden></div>
+      <form id="search-form" class="search" hidden>
+        <input type="search" id="keyword" placeholder="Search by keyword, e.g. parks, traffic, zoning" autocomplete="off">
+        <button class="btn" type="submit">Search</button>
+      </form>
+      <div id="results"></div>
+      <div id="log" class="panel" hidden></div>
+    </section>
+
+    <section id="view-history" hidden>
+      <h1 style="font-size:22px;margin:0 0 16px">Download history</h1>
+      <div id="history"></div>
+    </section>
+
+    <section id="view-settings" hidden>
+      <h1 style="font-size:22px;margin:0 0 16px">Settings</h1>
+      <form id="settings-form" class="panel settings">
+        <div class="stack">
+          <label>Download folder
+            <input type="text" id="set-dir">
+            <span class="hint">Leave blank to use the default location.</span>
+          </label>
+          <label>Contact info (email or URL)
+            <input type="text" id="set-contact" placeholder="you@example.com">
+            <span class="hint">Included in the User-Agent so portal operators can reach you.</span>
+          </label>
+          <div>
+            <div class="hint" style="margin-bottom:4px">Current User-Agent</div>
+            <code class="ua" id="ua"></code>
+          </div>
+          <p class="hint" id="config-path"></p>
+          <div><button class="btn" type="submit">Save settings</button></div>
+        </div>
+      </form>
+    </section>
+  </main>
+</div>
+
+<div id="download-bar" class="download-bar" hidden>
+  <label>Format <select id="format"></select></label>
+  <button class="btn" id="download-btn">Download selected</button>
+  <span class="count" id="sel-count"></span>
+</div>
+
+<div id="toast" role="status"></div>
+
+<script>
+const $ = (sel) => document.querySelector(sel);
+const enc = encodeURIComponent;
+
+const state = {
+  portals: [],
+  portalKey: null,
+  results: [],
+  selected: new Set(),
+  lastQuery: '',
+  format: undefined,   // undefined = user hasn't picked; default to most common
+};
+
+// Build DOM nodes without innerHTML, so catalog text can't inject markup
+function el(tag, props = {}, ...kids) {
+  const node = document.createElement(tag);
+  for (const [k, v] of Object.entries(props)) {
+    if (v == null || v === false) continue;
+    if (k === 'class') node.className = v;
+    else if (k.startsWith('on')) node.addEventListener(k.slice(2), v);
+    else if (['checked', 'disabled', 'value'].includes(k)) node[k] = v;
+    else node.setAttribute(k, v === true ? '' : v);
+  }
+  for (const kid of kids.flat()) {
+    if (kid == null || kid === false) continue;
+    node.append(kid instanceof Node ? kid : String(kid));
+  }
+  return node;
+}
+
+async function api(path, { method, body } = {}) {
+  const init = { method: method || (body !== undefined ? 'POST' : 'GET'), headers: {} };
+  if (body !== undefined) {
+    init.headers['Content-Type'] = 'application/json';
+    init.body = JSON.stringify(body);
+  }
+  const res = await fetch(path, init);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+  return data;
+}
+
+function toast(message, kind = 'error') {
+  const t = $('#toast');
+  t.textContent = message;
+  t.className = 'show ' + kind;
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => (t.className = ''), 4500);
+}
+
+// ---------- Views ----------
+
+function showView(name) {
+  for (const v of ['search', 'history', 'settings']) $('#view-' + v).hidden = v !== name;
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('active', b.dataset.view === name));
+  renderDownloadBar();
+  if (name === 'history') loadHistory();
+  if (name === 'settings') loadSettings();
+}
+document.querySelectorAll('nav button').forEach(b => b.addEventListener('click', () => showView(b.dataset.view)));
+
+// ---------- Portals ----------
+
+async function loadPortals() {
+  try {
+    state.portals = (await api('/api/portals')).portals;
+    renderPortals();
+  } catch (e) {
+    $('#portal-list').replaceChildren(el('p', { class: 'muted' }, e.message));
+  }
+}
+
+function renderPortals() {
+  const groups = {};
+  for (const p of state.portals) (groups[p.province] ||= []).push(p);
+  const list = $('#portal-list');
+  list.replaceChildren();
+  for (const province of Object.keys(groups).sort()) {
+    list.append(el('div', { class: 'province' }, province));
+    for (const p of groups[province]) {
+      list.append(el('div', { class: 'portal' + (p.key === state.portalKey ? ' active' : '') },
+        el('button', { class: 'portal-name', onclick: () => selectPortal(p.key) },
+          p.name, p.user_added ? el('span', { class: 'badge' }, 'custom') : null),
+        p.user_added ? el('button', {
+          class: 'icon-btn', title: 'Delete ' + p.name, 'aria-label': 'Delete ' + p.name,
+          onclick: () => deletePortal(p),
+        }, '×') : null));
+    }
+  }
+}
+
+async function deletePortal(p) {
+  if (!confirm(`Delete the portal "${p.name}"?`)) return;
+  try {
+    await api('/api/portals?key=' + enc(p.key), { method: 'DELETE' });
+    if (state.portalKey === p.key) resetSearch();
+    await loadPortals();
+    toast(`Deleted ${p.name}`, 'ok');
+  } catch (e) { toast(e.message); }
+}
+
+$('#add-portal-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const form = e.target;
+  const body = Object.fromEntries(new FormData(form));
+  try {
+    const { key } = await api('/api/portals', { body });
+    form.reset();
+    form.closest('details').open = false;
+    await loadPortals();
+    selectPortal(key);
+  } catch (err) { toast(err.message); }
+});
+
+function resetSearch() {
+  state.portalKey = null;
+  state.results = [];
+  state.selected.clear();
+  $('#portal-header').replaceChildren(el('p', { class: 'empty' }, 'Pick a portal on the left to begin.'));
+  $('#search-form').hidden = true;
+  $('#updates').hidden = true;
+  $('#results').replaceChildren();
+  $('#log').hidden = true;
+  renderDownloadBar();
+}
+
+async function selectPortal(key, refresh = false) {
+  const portal = state.portals.find(p => p.key === key);
+  resetSearch();
+  state.portalKey = key;
+  renderPortals();
+  showView('search');
+  $('#portal-header').replaceChildren(
+    el('p', { class: 'loading muted' }, `Loading the ${portal ? portal.name : key} catalog…`));
+
+  try {
+    const info = await api(`/api/catalog?portal=${enc(key)}${refresh ? '&refresh=1' : ''}`);
+    if (state.portalKey !== key) return;
+    $('#portal-header').replaceChildren(el('div', { class: 'portal-header' },
+      el('div', {},
+        el('h1', {}, info.name),
+        el('p', { class: 'muted' }, `${info.count.toLocaleString()} datasets · ${info.province}`,
+          info.homepage ? [' · ', el('a', { href: info.homepage, target: '_blank', rel: 'noopener' }, 'Visit portal')] : null)),
+      el('button', { class: 'secondary', onclick: () => selectPortal(key, true) }, 'Refresh catalog')));
+    $('#search-form').hidden = false;
+    $('#keyword').focus();
+    loadUpdates(key);
+  } catch (e) {
+    if (state.portalKey !== key) return;
+    $('#portal-header').replaceChildren(el('div', { class: 'panel notice' },
+      el('p', { style: 'margin-top:0' }, e.message),
+      el('button', { class: 'secondary', onclick: () => selectPortal(key, true) }, 'Try again')));
+  }
+}
+
+// ---------- Updates to previously downloaded datasets ----------
+
+async function loadUpdates(key) {
+  const box = $('#updates');
+  let updates;
+  try { updates = (await api('/api/updates?portal=' + enc(key))).updates; }
+  catch { return; }
+  if (state.portalKey !== key || !updates.length) return;
+
+  const checks = updates.map(() => el('input', { type: 'checkbox', checked: true }));
+  const rows = updates.map((u, i) => el('label', { class: 'update-row check' }, checks[i],
+    el('div', {},
+      el('div', { style: 'font-weight:600' }, u.title),
+      el('div', { class: 'muted', style: 'font-size:12px' },
+        `${u.format || 'unknown format'} · was ${u.old_modified} → now ${u.new_modified}`))));
+
+  const refreshBtn = el('button', { class: 'btn', onclick: async () => {
+    refreshBtn.disabled = true;
+    for (const [i, u] of updates.entries()) {
+      if (!checks[i].checked) continue;
+      const status = el('div', { class: 'muted loading', style: 'font-size:12px' }, 'Downloading…');
+      rows[i].querySelector('div').append(status);
+      try {
+        const res = await api('/api/download', { body: {
+          portal: key, dataset_id: u.dataset_id, format: u.format || null, first_only: true } });
+        status.replaceWith(...(res.results.length
+          ? res.results.map(r => renderResult(r, u.dataset_id, key))
+          : [el('div', { class: 'result skipped' }, el('span', { class: 'status' }, 'Skipped'),
+              `No ${u.format} version found any more`)]));
+      } catch (e) {
+        status.replaceWith(el('div', { class: 'result failed' }, el('span', { class: 'status' }, 'Failed'), e.message));
+      }
+      checks[i].disabled = true;
+    }
+    refreshBtn.textContent = 'Done';
+  } }, 'Re-download selected');
+
+  box.replaceChildren(
+    el('h2', {}, `${updates.length} dataset${updates.length > 1 ? 's' : ''} you downloaded ${updates.length > 1 ? 'have' : 'has'} been updated`),
+    ...rows,
+    el('div', { class: 'row-actions' }, refreshBtn,
+      el('button', { class: 'secondary', onclick: () => (box.hidden = true) }, 'Dismiss')));
+  box.hidden = false;
+}
+
+// ---------- Search + results ----------
+
+$('#search-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const q = $('#keyword').value.trim();
+  if (!q || !state.portalKey) return;
+  const key = state.portalKey;
+  $('#results').replaceChildren(el('p', { class: 'loading muted' }, 'Searching…'));
+  try {
+    const { matches } = await api(`/api/search?portal=${enc(key)}&q=${enc(q)}`);
+    if (state.portalKey !== key) return;
+    state.results = matches;
+    state.selected.clear();
+    state.lastQuery = q;
+    state.format = undefined;
+    renderResults();
+  } catch (err) {
+    $('#results').replaceChildren();
+    toast(err.message);
+  }
+});
+
+$('#keyword').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    $('#search-form').requestSubmit();
+  }
+});
+
+function toggle(id, on) {
+  on ? state.selected.add(id) : state.selected.delete(id);
+  renderResults();
+}
+
+function renderResults() {
+  const box = $('#results');
+  box.replaceChildren();
+  if (!state.results.length) {
+    box.append(el('p', { class: 'empty' }, `No datasets match “${state.lastQuery}”.`));
+    renderDownloadBar();
+    return;
+  }
+
+  const selectable = state.results.filter(r => r.downloadable);
+  const allChecked = selectable.length > 0 && selectable.every(r => state.selected.has(r.id));
+  box.append(el('div', { class: 'results-head' },
+    el('span', {}, `${state.results.length} dataset${state.results.length > 1 ? 's' : ''} match “${state.lastQuery}”`),
+    selectable.length ? el('label', { class: 'check' },
+      el('input', { type: 'checkbox', checked: allChecked, onchange: (e) => {
+        for (const r of selectable) e.target.checked ? state.selected.add(r.id) : state.selected.delete(r.id);
+        renderResults();
+      } }), 'Select all') : null));
+
+  for (const r of state.results) {
+    const isSel = state.selected.has(r.id);
+    box.append(el('label', { class: 'card' + (r.downloadable ? '' : ' disabled') + (isSel ? ' selected' : '') },
+      el('input', { type: 'checkbox', checked: isSel, disabled: !r.downloadable,
+        onchange: (e) => toggle(r.id, e.target.checked) }),
+      el('div', { class: 'card-body' },
+        el('div', { class: 'card-title' }, r.title),
+        r.description ? el('p', { class: 'desc' }, r.description) : null,
+        el('div', { class: 'meta' },
+          !r.downloadable ? el('span', { class: 'muted' }, 'Landing page only — nothing to download')
+            : r.formats.length ? r.formats.map(f => el('span', { class: 'fmt' }, f))
+            : el('span', { class: 'muted' }, 'Format not listed'),
+          r.modified ? el('span', { class: 'muted' }, `Updated ${r.modified}`) : null,
+          r.landing_page ? el('a', { href: r.landing_page, target: '_blank', rel: 'noopener' }, 'Source page') : null))));
+  }
+  renderDownloadBar();
+}
+
+// Mirrors pick_formats(): formats across the selection, most common first, plus "All formats"
+function renderDownloadBar() {
+  const bar = $('#download-bar');
+  const chosen = state.results.filter(r => state.selected.has(r.id));
+  bar.hidden = chosen.length === 0 || $('#view-search').hidden;
+  if (!chosen.length) return;
+
+  const counts = {};
+  for (const r of chosen) for (const f of r.formats) counts[f] = (counts[f] || 0) + 1;
+  const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+
+  // Portals label the shapefile bundle differently — SHP on Vancouver, ZIP on
+  // Kelowna, Victoria and Burnaby — so offer it as one choice, listed first.
+  // It keeps the map geometry that CSV drops.
+  const shapefileCount = chosen.filter(r => r.has_shapefile).length;
+  if (shapefileCount) {
+    sorted.unshift(['SHAPEFILE', shapefileCount]);
+  }
+
+  const sel = $('#format');
+  sel.replaceChildren(
+    ...sorted.map(([f, c]) => el('option', { value: f },
+      f === 'SHAPEFILE'
+        ? `Shapefile — keeps geometry  (in ${c} of ${chosen.length})`
+        : `${f}  (in ${c} of ${chosen.length})`)),
+    el('option', { value: '' }, 'All formats'));
+  if (state.format !== undefined && [...sel.options].some(o => o.value === state.format)) sel.value = state.format;
+  $('#sel-count').textContent = `${chosen.length} dataset${chosen.length > 1 ? 's' : ''} selected`;
+}
+$('#format').addEventListener('change', (e) => (state.format = e.target.value));
+
+// ---------- Downloading ----------
+
+$('#download-btn').addEventListener('click', async () => {
+  const chosen = state.results.filter(r => state.selected.has(r.id));
+  if (!chosen.length) return;
+  const key = state.portalKey;
+  const fmt = $('#format').value || null;
+  const btn = $('#download-btn');
+  btn.disabled = true;
+
+  const log = $('#log');
+  log.hidden = false;
+  const fmtLabel = fmt === 'SHAPEFILE' ? 'shapefile' : fmt;
+  log.replaceChildren(el('h2', {},
+    fmt ? `Downloading ${fmtLabel} versions` : 'Downloading all available formats'));
+  log.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  let files = 0, missing = 0;
+  for (const r of chosen) {
+    const status = el('div', { class: 'muted loading' }, 'Working…');
+    const entry = el('div', { class: 'log-entry' },
+      el('div', { class: 'log-title' }, r.title,
+        r.modified ? el('span', { class: 'muted', style: 'font-weight:400' }, `  · source updated ${r.modified}`) : null),
+      status);
+    log.append(entry);
+    try {
+      const res = await api('/api/download', { body: { portal: key, dataset_id: r.id, format: fmt } });
+      if (!res.results.length) {
+        missing++;
+        status.replaceWith(el('div', { class: 'result skipped' }, el('span', { class: 'status' }, 'Skipped'),
+          fmt ? `No ${fmtLabel} version available for this dataset` : 'No downloadable data'));
+      } else {
+        files += res.results.filter(x => x.status === 'downloaded').length;
+        status.replaceWith(...res.results.map(x => renderResult(x, r.id, key)));
+      }
+    } catch (e) {
+      status.replaceWith(el('div', { class: 'result failed' }, el('span', { class: 'status' }, 'Failed'), e.message));
+    }
+  }
+  log.append(el('div', { class: 'summary' },
+    `Finished: ${files} file${files === 1 ? '' : 's'} downloaded, ${missing} dataset${missing === 1 ? '' : 's'} without a matching format.`));
+  btn.disabled = false;
+});
+
+const STATUS_LABELS = {
+  downloaded: 'Saved', blocked: 'Blocked by robots.txt', failed: 'Failed',
+  skipped: 'Skipped', too_large: 'Large file',
+};
+
+function renderResult(item, datasetId, portalKey) {
+  const row = el('div', { class: 'result ' + item.status },
+    el('span', { class: 'fmt' }, item.format || 'UNKNOWN'),
+    el('span', { class: 'status' }, STATUS_LABELS[item.status] || item.status));
+
+  if (item.status === 'downloaded') {
+    row.append(el('a', { href: '/files/' + enc(item.filename) }, item.filename),
+      el('span', { class: 'muted' }, `${item.size_kb.toLocaleString()} KB`));
+  } else if (item.status === 'too_large') {
+    const btn = el('button', { class: 'secondary small', onclick: async () => {
+      btn.disabled = true;
+      btn.textContent = 'Downloading…';
+      try {
+        const res = await api('/api/download', { body: {
+          portal: portalKey, dataset_id: datasetId, url: item.url, confirm_large: true } });
+        row.replaceWith(...res.results.map(x => renderResult(x, datasetId, portalKey)));
+      } catch (e) {
+        toast(e.message);
+        btn.disabled = false;
+        btn.textContent = 'Download anyway';
+      }
+    } }, 'Download anyway');
+    row.append(el('span', { class: 'muted' }, `${item.size_mb} MB — over the 100 MB limit`), btn);
+  } else if (item.message) {
+    row.append(el('span', { class: 'muted' }, item.message));
+  }
+  return row;
+}
+
+// ---------- History ----------
+
+async function loadHistory() {
+  const box = $('#history');
+  box.replaceChildren(el('p', { class: 'loading muted' }, 'Loading…'));
+  try {
+    const { downloads } = await api('/api/history');
+    if (!downloads.length) {
+      box.replaceChildren(el('p', { class: 'empty' }, 'Nothing downloaded yet.'));
+      return;
+    }
+    box.replaceChildren(el('div', { class: 'panel table-wrap', style: 'padding:4px 8px' }, el('table', {},
+      el('thead', {}, el('tr', {}, ['Dataset', 'Portal', 'Format', 'Downloaded (UTC)', 'Source updated', 'File'].map(h => el('th', {}, h)))),
+      el('tbody', {}, downloads.map(d => el('tr', {},
+        el('td', {}, d.title),
+        el('td', { class: 'nowrap' }, d.portal),
+        el('td', {}, d.format ? el('span', { class: 'fmt' }, d.format) : ''),
+        el('td', { class: 'nowrap' }, d.downloaded_at),
+        el('td', { class: 'nowrap' }, d.source_modified || '—'),
+        el('td', {}, d.filename ? el('a', { href: '/files/' + enc(d.filename) }, 'Open')
+          : el('span', { class: 'muted' }, 'Not in current folder'))))))));
+  } catch (e) {
+    box.replaceChildren(el('p', { class: 'muted' }, e.message));
+  }
+}
+
+// ---------- Settings ----------
+
+function fillSettings(s) {
+  $('#set-dir').value = s.download_dir_saved ? s.download_dir : '';
+  $('#set-dir').placeholder = s.default_download_dir;
+  $('#set-contact').value = s.user_contact;
+  $('#ua').textContent = s.user_agent;
+  $('#config-path').textContent = `Saved in ${s.config_path} (shared with the command-line tool).`;
+}
+
+async function loadSettings() {
+  try { fillSettings(await api('/api/settings')); }
+  catch (e) { toast(e.message); }
+}
+
+$('#settings-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try {
+    fillSettings(await api('/api/settings', { body: {
+      download_dir: $('#set-dir').value, user_contact: $('#set-contact').value } }));
+    toast('Settings saved', 'ok');
+  } catch (err) { toast(err.message); }
+});
+
+loadPortals();
+</script>
+</body>
+</html>
