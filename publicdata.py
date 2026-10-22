@@ -10,6 +10,7 @@ skips HTML landing pages and other non-data URLs.
 """
 
 import json
+import threading
 import time
 import urllib.robotparser
 from datetime import datetime, timezone
@@ -116,27 +117,38 @@ NON_DATA_FORMATS = {
 #Rate limiter 
 
 class RateLimiter:
-    """Tracks time of last request per domain and enforces a minimum delay."""
+    """Enforces a minimum delay between requests to the same domain.
+
+    Safe to call from several threads at once, which matters because the web
+    interface serves every request on its own thread. Checking the last
+    request time and then sleeping would not be enough: several threads would
+    all read the same timestamp, all sleep the same amount, and then all fire
+    together — five simultaneous requests went out in 1.5s instead of 6s.
+
+    Instead each caller claims the next free slot for that domain, so the
+    slots are handed out in turn however many threads are asking.
+    """
 
     def __init__(self, delay_seconds=1.5):
         self.delay_seconds = delay_seconds
-        self._last_request_time = {}
+        #domain -> the earliest time the next request to it may be made
+        self._next_allowed = {}
+        self._lock = threading.Lock()
 
     def wait_for(self, url):
         domain = urlparse(url).netloc.lower()
         if not domain:
             return
-        now = time.time()
-        last_time = self._last_request_time.get(domain)
 
-        if last_time is not None:
-            elapsed = now - last_time
-            wait_needed = self.delay_seconds - elapsed
-            if wait_needed > 0:
-                time.sleep(wait_needed)
-                now = time.time()
+        #Claim the slot while holding the lock, but sleep after releasing it,
+        #so a slow domain never holds up requests to a different one
+        with self._lock:
+            slot = max(time.time(), self._next_allowed.get(domain, 0.0))
+            self._next_allowed[domain] = slot + self.delay_seconds
 
-        self._last_request_time[domain] = now
+        remaining = slot - time.time()
+        if remaining > 0:
+            time.sleep(remaining)
 
 
 rate_limiter = RateLimiter(delay_seconds=RATE_LIMIT_SECONDS)
