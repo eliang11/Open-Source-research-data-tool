@@ -136,6 +136,8 @@ Files downloaded:                  1
 Datasets with no matching format:  0
 No issues encountered this session.
 ```
+Running the web interface
+As well as the terminal version, the tool has a local web interface with the same features: browsing portals, searching, picking formats, downloading and viewing history.
 
 ## How it works
 1. Choose a portal from the built-in list, or add your own
