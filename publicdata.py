@@ -85,6 +85,25 @@ DATA_FORMATS = {
     "GDB",
 }
 
+#Portals disagree on what to call a shapefile download. Vancouver labels it
+#"SHP"; Kelowna, Victoria and Burnaby label the identical bundle "ZIP" (each
+#verified to contain a complete .shp/.shx/.dbf/.prj set). Picking "SHP" would
+#therefore return nothing on three of the four portals, so this virtual format
+#matches either label and lets one choice work everywhere.
+#
+#It matters because CSV drops the geometry: a polygon layer exported to CSV
+#keeps the attributes and an area figure, but not the outline itself.
+SHAPEFILE_FORMAT = "SHAPEFILE"
+
+#Labels that always mean a shapefile
+SHAPEFILE_ALIASES = {"SHP", "SHAPEFILE"}
+
+#ArcGIS Hub also offers a File Geodatabase under that same "ZIP" label, with
+#only the distribution title and the download URL to tell them apart, so a
+#plain label check would fetch both. These words mark a ZIP as something else.
+NOT_SHAPEFILE_HINTS = ("filegdb", "geodatabase", ".gdb", "kml", "kmz",
+                       "csv", "geojson", "excel", "xlsx")
+
 NON_DATA_FORMATS = {
     "WEB PAGE", "HTML", "WEBSITE",
     "ESRI REST",
@@ -878,10 +897,20 @@ def pick_formats(selected_datasets):
         key=lambda pair: (-pair[1], pair[0])
     )
 
+    #Offer the shapefile bundle as one choice, listed first, however the portal
+    #happens to label it. Shapefiles keep the geometry that CSV discards.
+    shapefile_count = sum(
+        1 for ds in selected_datasets
+        if find_downloadable_distributions(ds, SHAPEFILE_FORMAT)
+    )
+    if shapefile_count:
+        sorted_formats.insert(0, (SHAPEFILE_FORMAT, shapefile_count))
+
     print("Available formats:")
     for i, (fmt, count) in enumerate(sorted_formats, 1):
         coverage = f"available in {count}/{len(selected_datasets)} dataset(s)"
-        print(f"  [{i}] {fmt}  ({coverage})")
+        label = f"{fmt}  (keeps map geometry; SHP or ZIP)" if fmt == SHAPEFILE_FORMAT else fmt
+        print(f"  [{i}] {label}  ({coverage})")
     all_option = len(sorted_formats) + 1
     print(f"  [{all_option}] All formats (download every available version)")
 
@@ -925,14 +954,57 @@ def is_downloadable_data(distribution):
     return False
 
 
+def is_shapefile_distribution(distribution):
+    """Return True if this distribution is the shapefile bundle.
+
+    Needed because portals disagree: Vancouver labels it "SHP", while Kelowna,
+    Victoria and Burnaby label it "ZIP" — and those same portals also publish a
+    File Geodatabase as "ZIP". The title and URL are what separate them.
+    """
+    fmt = (distribution.get("format") or "").upper().strip()
+    if fmt in SHAPEFILE_ALIASES:
+        return True
+    if fmt != "ZIP":
+        return False
+
+    hint = " ".join((
+        distribution.get("title") or "",
+        distribution.get("downloadURL") or distribution.get("accessURL") or "",
+    )).lower()
+
+    if "shapefile" in hint:
+        return True
+    if any(word in hint for word in NOT_SHAPEFILE_HINTS):
+        return False
+
+    #A ZIP with nothing to distinguish it: on these portals that is the
+    #shapefile export, so treat it as one rather than hiding it
+    return True
+
+
 def find_downloadable_distributions(dataset, preferred_format=None):
-    """Get downloadable distributions, optionally filtered to a specific format."""
+    """Get downloadable distributions, optionally filtered to a specific format.
+
+    SHAPEFILE_FORMAT is a virtual format: it matches whichever label the portal
+    uses for its shapefile bundle, rather than a format string of its own.
+    """
     matches = [d for d in dataset.get("distribution", []) if is_downloadable_data(d)]
 
     if preferred_format is None:
         return matches
 
     preferred_upper = preferred_format.upper().strip()
+
+    if preferred_upper == SHAPEFILE_FORMAT:
+        shapefiles = [d for d in matches if is_shapefile_distribution(d)]
+        #If a portal offers both labels, take the explicit one rather than
+        #downloading the same data twice
+        explicit = [
+            d for d in shapefiles
+            if (d.get("format") or "").upper().strip() in SHAPEFILE_ALIASES
+        ]
+        return explicit or shapefiles
+
     return [
         d for d in matches
         if (d.get("format") or "").upper().strip() == preferred_upper
@@ -1072,43 +1144,43 @@ def download_distribution(distribution, dataset, portal_key):
 #Main flow 
 
 def main():
-    #Get the download location
+    # Get the download location
     global DOWNLOAD_DIR
     DOWNLOAD_DIR = get_download_dir()
     print(f"Files will be saved to: {DOWNLOAD_DIR.resolve()}\n")
 
-    #Get the User-Agent (asks user on first run for contact info)
+    # Get the User-Agent (asks user on first run for contact info)
     global USER_AGENT
     USER_AGENT = get_user_agent()
 
-    #Initialize robots.txt cache with the resolved User-Agent
+    # Initialize robots.txt cache with the resolved User-Agent
     global robots_cache
     robots_cache = RobotsCache(USER_AGENT)
 
-    #Session state — kept across searches within the same portal
+    # Session state — kept across searches within the same portal
     current_portal_key = None
     current_portal = None
     current_datasets = None
 
-    #Main session loop — keeps running until user quits
+    # Main session loop — keeps running until user quits
     while True:
-        #If no portal selected yet, prompt for one
+        # If no portal selected yet, prompt for one
         if current_portal is None:
             current_portal_key, current_portal = pick_portal()
             if current_portal is None:
-                #User cancelled the portal picker
+                # User cancelled the portal picker
                 break
 
-            #Fetch catalog for this portal (only once per portal)
+            # Fetch catalog for this portal (only once per portal)
             current_datasets = fetch_catalog(current_portal)
             if current_datasets is None:
-                #Catalog failed — reset and let user pick another portal
+                # Catalog failed — reset and let user pick another portal
                 print("Try a different portal.\n")
                 current_portal_key = None
                 current_portal = None
                 continue
 
-            #Check for updates on previously-downloaded datasets from this portal
+            # Check for updates on previously-downloaded datasets from this portal
             updates = check_for_updates(current_datasets, current_portal_key)
             if updates:
                 selected_updates = prompt_for_update_refresh(updates)
@@ -1128,7 +1200,7 @@ def main():
                         download_distribution(dists[0], current_ds, current_portal_key)
                     print()
 
-        #Keyword-search flow for the current portal
+        # Keyword-search flow for the current portal
         keyword = input(f"Enter a keyword to search {current_portal['name']} (or 'quit' to exit): ").strip()
         if not keyword or keyword.lower() in ("quit", "exit", "q"):
             break
@@ -1142,7 +1214,7 @@ def main():
             if selected:
                 preferred_format = pick_formats(selected)
                 if preferred_format == "CANCELLED":
-                    pass  #User cancelled format picker — skip to "what next"
+                    pass  # User cancelled format picker — skip to "what next"
                 else:
                     if preferred_format is None:
                         print("Downloading all available formats.\n")
@@ -1193,7 +1265,7 @@ def main():
                     print(f"Files downloaded:                  {downloaded}")
                     print(f"Datasets with no matching format:  {no_data}")
 
-        #"What next?" prompt at the end of each cycle
+        # "What next?" prompt at the end of each cycle
         print()
         print("What would you like to do next?")
         print(f"  [1] Search {current_portal['name']} again")
@@ -1216,8 +1288,8 @@ def main():
         else:
             print("Please pick 1, 2, or 3.\n")
             continue
-        #Otherwise (including "1" or empty), just continue the loop
-        #which loops back to the keyword search for the same portal
+        # Otherwise (including "1" or empty), just continue the loop
+        # which loops back to the keyword search for the same portal
 
     print("\nExiting.")
     notifications.print_summary()
