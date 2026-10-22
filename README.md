@@ -37,6 +37,8 @@ stop the website from starting.
 
 No external packages are needed; the tool uses only Python standard library.
 
+
+
 ### First run
 Open a terminal, navigate to the folder containing `publicdata.py`, and run:
 **Windows Powershell:**
@@ -143,8 +145,51 @@ Files downloaded:                  1
 Datasets with no matching format:  0
 No issues encountered this session.
 ```
-Running the web interface
+##Running the web interface
 As well as the terminal version, the tool has a local web interface with the same features: browsing portals, searching, picking formats, downloading and viewing history.
+
+## Running with Docker
+
+Docker runs the web interface in a container, which works the same way on
+Windows, macOS and Linux. Python does not need to be installed.
+
+From the project folder:
+
+```
+docker compose up --build
+```
+
+Then open <http://localhost:8000>. Press Ctrl+C, or run `docker compose down`,
+to stop it.
+
+Downloaded files appear in a `downloads` folder next to the Dockerfile.
+Settings, your portal list and download history are kept in a Docker volume,
+so they survive restarts.
+
+Before real use, set your contact address in `docker-compose.yml`:
+
+```
+environment:
+  OPENDATA_CONTACT: "you@example.com"
+```
+
+Portals see this in the User-Agent. Left as `unknown-user`, some portals are
+more likely to block the requests.
+
+### Notes
+
+- If port 8000 is already in use, change the first number only, for example
+  `"8080:8000"`.
+- The container listens on all interfaces inside its own network namespace,
+  which is why `OPENDATA_HOST=0.0.0.0` is set in the Dockerfile. The container
+  boundary provides the isolation that binding to localhost provides when
+  running directly.
+- The command-line tool also runs in the container, with an interactive
+  terminal:
+
+```
+docker run --rm -it -v "%cd%/downloads:/data" opendata-explorer python publicdata.py
+```
 
 ## How it works
 1. Choose a portal from the built-in list, or add your own
@@ -182,6 +227,35 @@ Found 7 datasets matching 'roads'.
 After search results appear, the tool asks you to pick which datasets to download. You can pick individual datasets like (`1,3,5`), ranges (`1-4`), combinations (`1- 3,7,10 `), or all.
 Once you pick the datasets, the tool shows you which formats are available to download across all your picks. 
 Note: some formats may be available for some datasets and not for others
+
+### Choosing a format: shapefiles vs CSV
+
+The format list offers **Shapefile** first where it is available. It is worth
+understanding what the choice costs.
+
+CSV drops the map geometry. Exporting a polygon layer to CSV keeps the
+attributes and a `SHAPESTArea` figure, but not the outline itself — so you can
+tell how large each feature is, but not where it is or what shape it has. For
+point datasets CSV keeps the X/Y coordinates, so less is lost.
+
+Shapefile and GeoJSON both preserve the geometry:
+
+| Format | Geometry | Coordinate system |
+|--------|----------|-------------------|
+| CSV | lost for lines and polygons | n/a |
+| GeoJSON | yes | always WGS84 |
+| Shapefile | yes | the portal's own, recorded in the `.prj` file |
+
+A shapefile arrives as a `.zip` containing `.shp`, `.shx`, `.dbf` and `.prj`.
+That is normal — the parts belong together and GIS software opens the set.
+
+**Why "Shapefile" and not "SHP":** portals disagree on the label. Vancouver
+calls it `SHP`; Kelowna, Victoria and Burnaby call the identical bundle `ZIP`.
+Picking `SHP` would therefore return nothing on three of the four portals, so
+the tool offers a single "Shapefile" choice that matches either label.
+
+Those same portals also publish a File Geodatabase under the `ZIP` label. The
+tool tells the two apart and downloads only the shapefile.
 
 ### Update detection
 Every download is recorded to `~/.publicdatahistory.json` along with the source's "last modified" timestamp at the time of download. When you run the tool again with the same portal, it compares your local records to the current catalog. If any dataset has been updated at the source since your last download, you're shown a list and asked whether to refresh.
@@ -304,4 +378,12 @@ The tool is designed for individual use, one user at a time on their own machine
 ## Known Limitations
 - Only supports ArcGIS Hub portals (with DCAT feed). CKAN and Socrata portals aren't supported.
 - No CKAN support means the Province of BC catalog can't be used yet.
-- webapp only supports Windows Users 
+- webapp only supports Windows Users
+
+## Development notes
+
+Parts of this tool, particularly the local web interface and the Docker setup,
+were written with AI assistance (Claude). All code has been reviewed and tested
+by the author.
+
+## License 
