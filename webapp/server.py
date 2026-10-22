@@ -14,6 +14,7 @@ Run:   python webapp/server.py          (opens http://127.0.0.1:8000)
 import html
 import json
 import mimetypes
+import os
 import re
 import socket
 import sys
@@ -21,7 +22,7 @@ import threading
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, unquote, urlparse
+from urllib.parse import parse_qs, unquote, urlparse, urlsplit
 from urllib.request import Request, urlopen
 
 WEB_ROOT = Path(__file__).resolve().parent
@@ -30,7 +31,21 @@ sys.path.insert(0, str(WEB_ROOT.parent))
 import publicdata as core  # noqa: E402  (needs the sys.path tweak above)
 
 
-HOST = "127.0.0.1"
+#Bind address. The loopback by default, so the site is reachable only from
+#this computer. Inside a container that loopback is the container's own, which
+#nothing outside can reach, so the Dockerfile sets OPENDATA_HOST=0.0.0.0 —
+#there the container boundary and the published port do the same job.
+HOST = os.environ.get("OPENDATA_HOST", "127.0.0.1")
+
+#Host header names that may address this server, used to block DNS-rebinding.
+#The port is deliberately not checked: a container can publish on a different
+#port than it binds, so "localhost:8080" is legitimate while PORT is 8000.
+ALLOWED_HOST_NAMES = {"127.0.0.1", "localhost", "::1"}
+ALLOWED_HOST_NAMES |= {
+    name.strip().lower()
+    for name in os.environ.get("OPENDATA_ALLOW_HOSTS", "").split(",")
+    if name.strip()
+}
 
 _port_args = [a for a in sys.argv[1:] if not a.startswith("-")]
 REQUESTED_PORT = int(_port_args[0]) if _port_args else 8000
@@ -160,6 +175,10 @@ def summarize_dataset(ds):
         "description": description,
         "modified": (ds.get("modified") or "")[:10],
         "formats": formats,
+        #Whether a shapefile is on offer under any of the labels portals use
+        "has_shapefile": bool(
+            core.find_downloadable_distributions(ds, core.SHAPEFILE_FORMAT)
+        ),
         "downloadable": bool(downloadables),
         "landing_page": ds.get("landingPage") or "",
     }
@@ -427,9 +446,10 @@ class Handler(BaseHTTPRequestHandler):
         self._dispatch("DELETE")
 
     def _dispatch(self, method):
-        #Only answer requests addressed to this machine (blocks DNS-rebinding tricks)
-        allowed_hosts = {f"127.0.0.1:{PORT}", f"localhost:{PORT}"}
-        if self.headers.get("Host") not in allowed_hosts:
+        #Only answer requests addressed to this machine (blocks DNS-rebinding
+        #tricks). urlsplit parses the name out of "host:port" and "[::1]:port".
+        hostname = urlsplit("//" + (self.headers.get("Host") or "")).hostname
+        if (hostname or "") not in ALLOWED_HOST_NAMES:
             self._send_json({"error": "Forbidden host"}, 403)
             return
 
@@ -533,7 +553,10 @@ def start_server():
 def main():
     apply_settings()
     server = start_server()
-    url = f"http://{HOST}:{PORT}"
+
+    #0.0.0.0 is an address to listen on, not one to visit, so show a usable one
+    display_host = "localhost" if HOST in ("0.0.0.0", "::") else HOST
+    url = f"http://{display_host}:{PORT}"
 
     if PORT != REQUESTED_PORT:
         print(f"Port {REQUESTED_PORT} is in use by another program; using {PORT}.")
@@ -541,7 +564,8 @@ def main():
     print(f"Downloads are saved to: {core.DOWNLOAD_DIR}")
     print("Press Ctrl+C to stop.")
 
-    if "--no-browser" not in sys.argv:
+    #Opening a browser is meaningless inside a container, where HOST is 0.0.0.0
+    if "--no-browser" not in sys.argv and HOST not in ("0.0.0.0", "::"):
         opener = threading.Timer(1.0, webbrowser.open, args=(url,))
         opener.daemon = True
         opener.start()
