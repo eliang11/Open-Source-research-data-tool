@@ -1,0 +1,10 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Shell scripts must keep LF endings. With CRLF, macOS and Linux fail with
+# "bad interpreter: /bin/bash^M" and the launcher does not start.
+*.sh text eol=lf
+*.command text eol=lf
+
+# Batch files are Windows-only, so keep CRLF for them
+*.bat text eol=crlf
