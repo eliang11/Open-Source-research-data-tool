@@ -376,9 +376,26 @@ rm ~/.publicdataconfig.json
 The tool is designed for individual use, one user at a time on their own machine. Each user's configuration, portal list, and download history are stored in files in their home directory; users on different machines or with different logins don't interfere with each other. This tool does not handle simultaneous access from multiple users to the same config files or download folder. If you are running it in a shared environment, give each user their own login or at least their own download folder to avoid conflicts. 
 
 ## Known Limitations
-- Only supports ArcGIS Hub portals (with DCAT feed). CKAN and Socrata portals aren't supported.
-- No CKAN support means the Province of BC catalog can't be used yet.
-- webapp only supports Windows Users
+
+**Portal types**
+- Only ArcGIS Hub portals (with a DCAT feed) are supported. CKAN and Socrata
+  portals are not.
+- Because there is no CKAN support, the Province of BC catalogue
+  (catalogue.data.gov.bc.ca) cannot be used yet.
+
+**Platforms**
+- The one-click `start-website.bat` is Windows-only. macOS and Linux users can
+  run `python3 webapp/server.py` directly, or use Docker.
+- Tested on Windows. The code uses no platform-specific calls, so it should
+  work on macOS and Linux, but this has not been confirmed on those systems.
+- On macOS, if every portal fetch fails with a certificate error, run
+  `Install Certificates.command` from your `/Applications/Python 3.x/` folder.
+  This is a known macOS Python issue, not a problem with this tool.
+
+**Scope**
+- The web interface runs locally and is not reachable from other devices.
+- Downloads are whole files; rows and columns cannot be filtered beforehand.
+- One user at a time per machine (see Multiple Users above).
 
 ## Development notes
 
@@ -387,3 +404,22 @@ were written with AI assistance (Claude). All code has been reviewed and tested
 by the author.
 
 ## License 
+
+## Data sources
+
+This tool downloads from publicly published open data catalogues:
+
+| Portal | Catalogue |
+|--------|-----------|
+| City of Kelowna | opendata.kelowna.ca |
+| City of Vancouver | opendata.vancouver.ca |
+| City of Victoria | opendata.victoria.ca |
+| City of Burnaby | data.burnaby.ca |
+
+The tool reads each portal's published DCAT catalogue; it does not scrape web
+pages. It identifies itself with a contact address, honours `robots.txt`, and
+waits 1.5 seconds between requests to the same site.
+
+Each portal licenses its data under its own terms. You are responsible for
+checking and following the licence of any dataset you download. This tool's
+licence covers the tool itself, not the data it retrieves.
