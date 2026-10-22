@@ -1,0 +1,18 @@
+# Python bytecode — regenerated automatically, never worth committing
+__pycache__/
+*.py[cod]
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Downloaded datasets — "downloads/" is where docker-compose.yml puts them
+downloads/
+open-data-downloads/
+
+# Editor / OS clutter
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
