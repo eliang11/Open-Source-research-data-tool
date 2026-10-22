@@ -700,7 +700,10 @@ def prompt_for_update_refresh(updates):
 
         print(f"  [{i:2}] {title}")
         print(f"       Format: {fmt}")
-        print(f"       Was: {old_date}  →  Now: {new_date}")
+        #Plain "->" rather than an arrow character: Windows uses cp1252 when
+        #output is redirected to a file, and that encoding has no U+2192, so
+        #an arrow here crashes the whole run with a UnicodeEncodeError
+        print(f"       Was: {old_date}  ->  Now: {new_date}")
 
     print()
     print("Re-download updated datasets?")
