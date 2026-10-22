@@ -1,0 +1,27 @@
+# Convenience wrapper so the volumes and port don't have to be retyped.
+#
+#   docker compose up --build      start it (http://localhost:8000)
+#   docker compose down            stop it
+#
+# Downloads appear in ./downloads on this computer.
+
+services:
+  opendata:
+    build: .
+    image: opendata-explorer
+    ports:
+      # host:container — change only the left number if 8000 is taken,
+      # e.g. "8080:8000". The server no longer minds the mismatch.
+      - "8000:8000"
+    volumes:
+      # Downloaded files, visible on this computer
+      - ./downloads:/data
+      # Settings, portal list and download history, kept between restarts
+      - opendata-config:/config
+    environment:
+      # Portals see this in the User-Agent; put your email here
+      OPENDATA_CONTACT: "unknown-user"
+    restart: unless-stopped
+
+volumes:
+  opendata-config:
