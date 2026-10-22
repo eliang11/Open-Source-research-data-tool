@@ -213,6 +213,90 @@ User-added portals are grouped by province in the picker for easy navigation.
 Portal choices are saved to `~/.publicdataportals.json` and persist over runs. Built-in portals can't be deleted, but user-added ones can be removed 
 using the "Delete a user-added portal" option in the picker menu.
 
+### Adding another city's portal
+
+The four built-in portals are a starting point, not a limit. Any ArcGIS Hub
+portal that publishes a DCAT feed can be added.
+
+#### Adding one
+
+**In the web interface:** open **Add a portal** in the left sidebar, fill in
+the form, and click **Add portal**.
+
+**In the command-line tool:** at the portal list, choose **[5] Add a new
+portal**, then answer the prompts.
+
+Either way you supply:
+
+| Field | Meaning | Example |
+|-------|---------|---------|
+| Short key | lowercase, no spaces; used internally and to prefix filenames | `newwest` |
+| Display name | what you see in the list | `City of New Westminster` |
+| Catalog URL | the DCAT feed (see below) | `https://opendata.newwestcity.ca/api/feed/dcat-us/1.1.json` |
+| Homepage | optional, a link shown next to the portal | `https://opendata.newwestcity.ca` |
+| Province | groups the list; anything you like | `British Columbia` |
+
+Portals you add are saved to `~/.publicdataportals.json` and appear on every
+later run, marked *user-added*. Built-in portals cannot be deleted; your own
+can, with **[6] Delete a user-added portal** or the **×** beside its name in
+the web interface.
+
+#### Finding the catalog URL
+
+Start from the portal's home page and try these two addresses:
+
+```
+{homepage}/api/feed/dcat-us/1.1.json
+{homepage}/data.json
+```
+
+Open each in a browser. The one that works returns JSON containing a
+`"dataset"` array. That is the URL to paste in.
+
+#### Check it before adding
+
+A feed that loads is not necessarily a feed you can download from. Two things
+to look for in the JSON:
+
+1. A `"dataset"` array with a sensible number of entries.
+2. Inside a dataset, a `"distribution"` list whose entries have a `"format"`
+   such as `CSV`, `GeoJSON`, `KML` or `ZIP`.
+
+If the distributions have no `"format"`, the portal is probably running
+Socrata or CKAN rather than ArcGIS Hub. The catalog will load and datasets
+will appear, but the format picker will show "(no format)" for everything and
+the Shapefile option will find nothing. Support for those portal types is
+planned; see Known Limitations.
+
+#### A worked example
+
+City of New Westminster publishes an ArcGIS Hub feed:
+
+```
+Short key    : newwest
+Display name : City of New Westminster
+Catalog URL  : https://opendata.newwestcity.ca/api/feed/dcat-us/1.1.json
+Homepage     : https://opendata.newwestcity.ca
+Province     : British Columbia
+```
+
+That gives 169 datasets, 96 of them with downloadable files in CSV, GeoJSON,
+KML and ZIP — and all 96 offer shapefiles.
+
+#### When it does not work
+
+| What you see | What it means |
+|--------------|---------------|
+| `HTTP Error 404` on both addresses | Not an ArcGIS Hub portal. It may be CKAN or Socrata, which are not supported yet. |
+| `getaddrinfo failed` / cannot resolve | The address does not exist. Find the real one from the city's own website rather than guessing. |
+| `CERTIFICATE_VERIFY_FAILED` | The portal's HTTPS certificate is not valid. Nothing this tool can fix; report it to the portal operator. |
+| Feed loads, but every format shows "(no format)" | A DCAT feed from a non-ArcGIS portal. Datasets list, but format picking will not work properly. |
+| `Portal type '...' is not yet supported` | The saved entry has a type other than `arcgis_hub`. |
+
+Guessing addresses rarely works — of ten BC and Canadian portals tried by
+guesswork, only one had a usable feed at a guessed address. Start from the
+city's open data page and look for an API, Developers or Download link.
+
 ### Keyword Search
 
 Enter a search term after selecting a portal, and the tool filters the catalog to datasets whose title, description, or tags contain that keyword. Matching is case-insensitive and works on partial words. 
