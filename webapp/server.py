@@ -32,14 +32,15 @@ import publicdata as core  # noqa: E402  (needs the sys.path tweak above)
 
 
 #Bind address. The loopback by default, so the site is reachable only from
-#this computer. Inside a container that loopback is the container's own, which
-#nothing outside can reach, so the Dockerfile sets OPENDATA_HOST=0.0.0.0 —
-#there the container boundary and the published port do the same job.
+#this computer — which is what you want when running it locally. Set
+#OPENDATA_HOST=0.0.0.0 only when something else provides the isolation, such
+#as a hosting platform that terminates connections in front of this server.
 HOST = os.environ.get("OPENDATA_HOST", "127.0.0.1")
 
 #Host header names that may address this server, used to block DNS-rebinding.
-#The port is deliberately not checked: a container can publish on a different
-#port than it binds, so "localhost:8080" is legitimate while PORT is 8000.
+#The port is deliberately not checked, because the port a client connects to
+#is not always the port this process bound — anything forwarding or mapping
+#ports in front of it makes "localhost:8080" legitimate while PORT is 8000.
 ALLOWED_HOST_NAMES = {"127.0.0.1", "localhost", "::1"}
 ALLOWED_HOST_NAMES |= {
     name.strip().lower()
@@ -564,7 +565,8 @@ def main():
     print(f"Downloads are saved to: {core.DOWNLOAD_DIR}")
     print("Press Ctrl+C to stop.")
 
-    #Opening a browser is meaningless inside a container, where HOST is 0.0.0.0
+    #No browser to open when bound to all interfaces: that only happens when
+    #something else is serving this to a user elsewhere
     if "--no-browser" not in sys.argv and HOST not in ("0.0.0.0", "::"):
         opener = threading.Timer(1.0, webbrowser.open, args=(url,))
         opener.daemon = True
@@ -577,6 +579,10 @@ def main():
     finally:
         server.server_close()
         print("\nStopped.")
+
+
+if __name__ == "__main__":
+    main()
 
 
 if __name__ == "__main__":
