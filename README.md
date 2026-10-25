@@ -148,49 +148,6 @@ No issues encountered this session.
 ##Running the web interface
 As well as the terminal version, the tool has a local web interface with the same features: browsing portals, searching, picking formats, downloading and viewing history.
 
-## Running with Docker
-
-Docker runs the web interface in a container, which works the same way on
-Windows, macOS and Linux. Python does not need to be installed.
-
-From the project folder:
-
-```
-docker compose up --build
-```
-
-Then open <http://localhost:8000>. Press Ctrl+C, or run `docker compose down`,
-to stop it.
-
-Downloaded files appear in a `downloads` folder next to the Dockerfile.
-Settings, your portal list and download history are kept in a Docker volume,
-so they survive restarts.
-
-Before real use, set your contact address in `docker-compose.yml`:
-
-```
-environment:
-  OPENDATA_CONTACT: "you@example.com"
-```
-
-Portals see this in the User-Agent. Left as `unknown-user`, some portals are
-more likely to block the requests.
-
-### Notes
-
-- If port 8000 is already in use, change the first number only, for example
-  `"8080:8000"`.
-- The container listens on all interfaces inside its own network namespace,
-  which is why `OPENDATA_HOST=0.0.0.0` is set in the Dockerfile. The container
-  boundary provides the isolation that binding to localhost provides when
-  running directly.
-- The command-line tool also runs in the container, with an interactive
-  terminal:
-
-```
-docker run --rm -it -v "%cd%/downloads:/data" opendata-explorer python publicdata.py
-```
-
 ## How it works
 1. Choose a portal from the built-in list, or add your own
 2. The tool fetches the portal's dataset catalog
