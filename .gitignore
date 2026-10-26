@@ -7,7 +7,7 @@ __pycache__/
 venv/
 env/
 
-# Downloaded datasets — "downloads/" is where docker-compose.yml puts them
+# Downloaded datasets — "downloads/" puts them
 downloads/
 open-data-downloads/
 
